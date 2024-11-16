@@ -1,0 +1,54 @@
+Ja, du kannst Python in einem Bash-Skript integrieren. Es gibt mehrere Möglichkeiten, dies zu tun:
+
+### 1. Python-Skript innerhalb des Bash-Skripts:
+
+Du kannst ein Python-Skript direkt in deinem Bash-Skript schreiben, indem du es zwischen `<<EOF` und `EOF` setzt. Hier ist ein Beispiel:
+
+```bash
+#!/bin/bash
+
+echo "Dies ist ein Bash-Skript."
+
+python3 - << EOF
+print("Dies ist ein Python-Skript innerhalb eines Bash-Skripts.")
+# Füge hier deinen Python-Code hinzu
+EOF
+
+echo "Das Bash-Skript endet hier."
+```
+
+### 2. Aufruf eines externen Python-Skripts:
+
+Eine andere Möglichkeit besteht darin, ein separates Python-Skript zu erstellen und dieses von dem Bash-Skript aus aufzurufen:
+
+```bash
+#!/bin/bash
+
+echo "Dies ist ein Bash-Skript."
+
+# Aufruf eines externen Python-Skripts
+python3 mein_script.py
+
+echo "Das Bash-Skript endet hier."
+```
+
+In diesem Fall befindet sich der Python-Code in der Datei `mein_script.py`.
+
+### 3. Verwendung von Python für Inline-Befehle:
+
+Du kannst auch Inline-Python-Befehle aus deinem Bash-Skript heraus ausführen:
+
+```bash
+#!/bin/bash
+
+echo "Dies ist ein Bash-Skript."
+
+result=$(python3 -c "print(2 + 2)")
+echo "Das Ergebnis der Berechnung ist: $result"
+
+echo "Das Bash-Skript endet hier."
+```
+
+### Fazit
+
+Es gibt also mehrere Möglichkeiten, Python in Bash-Skripts zu integrieren, je nach deinen Bedürfnissen und der Struktur deines Skripts. Wähle die Methode, die am besten zu deinem Anwendungsfall passt!
