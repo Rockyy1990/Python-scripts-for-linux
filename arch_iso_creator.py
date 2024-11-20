@@ -27,19 +27,32 @@ packages = [
     'networkmanager',
     'dhcpcd',
     'xfce4',
+    'xfce4-session',
+    'xfce4-terminal',
+    'mousepad',
     'xorg-server',
     'xorg-xinit',
+    'xorg-xauth',
+    'xorg-xinput',
+    'xorg-xkill',
     'xterm',
     'lightdm',
     'lightdm-gtk-greeter',
-    'chromium',
+    'firefox',
+    'firefox-i18n-de',
     'thunderbird',
     'pipewire',
+    'pipewire-pulse',
+    'wireplumber',
     'pavucontrol',
     'alsa-firmware',
     'nano',
     'gnome-disk-utility',
     'mesa',
+    'mesa-utils'
+    'xf86-video-vesa'
+    'xf86-video-fbdev'
+    'xf86-video-intel'
     'xf86-video-amdgpu',
     'vulkan-radeon',
     'gtk3',
@@ -47,8 +60,9 @@ packages = [
     'fontconfig',
     'ttf-dejavu',
     'ttf-liberation',
+    'ttf-droid',
     'xorg-twm',
-    'xorg-xclock',
+    
 ]
 
 # Create the output directory
@@ -127,7 +141,7 @@ except subprocess.CalledProcessError as e:
 
 # Set the default locale and timezone
 locale_conf = """
-LANG=en_US.UTF-8
+LANG=de_DE.UTF-8
 """
 with open(os.path.join(PROFILE_DIR, "etc", "locale.conf"), "w") as f:
     f.write(locale_conf)
