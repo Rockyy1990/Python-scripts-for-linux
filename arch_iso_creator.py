@@ -49,10 +49,10 @@ packages = [
     'nano',
     'gnome-disk-utility',
     'mesa',
-    'mesa-utils'
-    'xf86-video-vesa'
-    'xf86-video-fbdev'
-    'xf86-video-intel'
+    'mesa-utils',
+    'xf86-video-vesa',
+    'xf86-video-fbdev',
+    'xf86-video-intel',
     'xf86-video-amdgpu',
     'vulkan-radeon',
     'gtk3',
