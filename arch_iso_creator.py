@@ -25,29 +25,47 @@ packages = [
     'archinstall',
     'grub',
     'networkmanager',
+    'fwupd',
     'dhcpcd',
     'xfce4',
     'xfce4-session',
     'xfce4-terminal',
+    'xdg-utils',
+    'xdg-desktop-portal',
+    'xdg-desktop-portal-gtk',
+    'xdg-user-dirs',
+    'gsmartcontrol',
     'mousepad',
     'xorg-server',
     'xorg-xinit',
     'xorg-xauth',
     'xorg-xinput',
     'xorg-xkill',
+    'libxcomposite',
     'xterm',
     'lightdm',
     'lightdm-gtk-greeter',
     'firefox',
     'firefox-i18n-de',
+    'soundconverter',
+    'ffmpeg',
+    'lame',
+    'flac',
     'thunderbird',
     'pipewire',
     'pipewire-pulse',
     'wireplumber',
     'pavucontrol',
     'alsa-firmware',
+    'python',
+    'python-reportlab',
+    'tcl',
+    'tk',
     'nano',
-    'gnome-disk-utility',
+    'gparted',
+    'mtools',
+    'xfsdump',
+    'f2fs-tools',
     'mesa',
     'mesa-utils',
     'xf86-video-vesa',
@@ -61,8 +79,8 @@ packages = [
     'ttf-dejavu',
     'ttf-liberation',
     'ttf-droid',
+    'ttf-ubuntu-font-family',
     'xorg-twm',
-    
 ]
 
 # Create the output directory
@@ -115,7 +133,7 @@ lightdm_conf = """
 [Seat:*]
 autologin-user=arch
 autologin-user-timeout=0
- user-session=xfce
+user-session=xfce
 greeter-session=lightdm-gtk-greeter
 """
 with open(os.path.join(PROFILE_DIR, "etc", "lightdm", "lightdm.conf"), "w") as f:
@@ -130,14 +148,21 @@ with open(os.path.join(PROFILE_DIR, "home", "arch", ".xinitrc"), "w") as f:
     f.write(xinitrc_content)
 os.chmod(os.path.join(PROFILE_DIR, "home", "arch", ".xinitrc"), 0o755)
 
+# Create a script to add the user during the installation
+user_script = """
+#!/bin/bash
 # Create a default user and set password
-try:
-    print("Creating default user 'arch'...")
-    subprocess.run(["useradd", "-m", "-G", "wheel", "arch"], check=True)
-    subprocess.run(["echo", "arch:password", "|", "chpasswd"], check=True)
-except subprocess.CalledProcessError as e:
-    print(f"Error creating user: {e}")
-    sys.exit(1)
+if ! id "arch" &>/dev/null; then
+    useradd -m -G wheel arch
+    echo 'arch:password' | chpasswd
+fi
+"""
+with open(os.path.join(PROFILE_DIR, "usr", "local", "bin", "create_user.sh"), "w") as f:
+    f.write(user_script)
+os.chmod(os.path.join(PROFILE_DIR, "usr", "local", "bin", "create_user.sh"), 0o755)
+
+# Note: The systemd service creation and enabling has been removed
+# as it cannot be enabled during the ISO build process.
 
 # Set the default locale and timezone
 locale_conf = """
@@ -162,6 +187,9 @@ Password: password
 To start the XFCE desktop environment, you can either:
 1. Use LightDM (default) - it will automatically log you in.
 2. Use startx command after logging in.
+
+To create the user, run the following command after booting into the live environment:
+sudo /usr/local/bin/create_user.sh
 
 Enjoy your custom Arch Linux experience!
 """
