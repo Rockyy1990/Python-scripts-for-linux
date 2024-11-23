@@ -33,6 +33,7 @@ packages = [
     'gvfs-nfs',
     'xfce4-session',
     'xfce4-terminal',
+    'file-roller',
     'xdg-utils',
     'xdg-desktop-portal',
     'xdg-desktop-portal-gtk',
@@ -66,6 +67,10 @@ packages = [
     'tcl',
     'tk',
     'nano',
+    'timeshift',
+    'deja-dup',
+    'fsarchiver',
+    'archiso',
     'gparted',
     'mtools',
     'xfsdump',
@@ -178,10 +183,33 @@ LANG=de_DE.UTF-8
 with open(os.path.join(PROFILE_DIR, "etc", "locale.conf"), "w") as f:
     f.write(locale_conf)
 
-# Set timezone (example: UTC)
-timezone = "UTC"
+# Set timezone to Europe/Berlin
+timezone = "Europe/Berlin"
 with open(os.path.join(PROFILE_DIR, "etc", "timezone"), "w") as f:
     f.write(timezone)
+
+# Add complete German language variables to /etc/environment
+environment_vars = """
+# German Language Variables
+LANG=de_DE.UTF-8
+LC_ALL=de_DE.UTF-8
+LANGUAGE=de_DE:de
+LC_CTYPE=de_DE.UTF-8
+LC_NUMERIC=de_DE.UTF-8
+LC_TIME=de_DE.UTF-8
+LC_COLLATE=de_DE.UTF-8
+LC_MONETARY=de_DE.UTF-8
+LC_MESSAGES=de_DE.UTF-8
+LC_PAPER=de_DE.UTF-8
+LC_NAME=de_DE.UTF-8
+LC_ADDRESS=de_DE.UTF-8
+LC_TELEPHONE=de_DE.UTF-8
+LC_MEASUREMENT=de_DE.UTF-8
+LC_IDENTIFICATION=de_DE.UTF-8
+"""
+
+with open(os.path.join(PROFILE_DIR, "etc", "environment"), "w") as f:
+    f.write(environment_vars)
 
 # Create a README file for user instructions
 readme_content = """
