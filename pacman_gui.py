@@ -25,6 +25,10 @@ class PacmanGUI:
         self.update_button = tk.Button(self.frame, text="Update System", command=self.update_system)
         self.update_button.pack(side=tk.LEFT)
 
+        # Create a button for removing packages
+        self.remove_button = tk.Button(self.frame, text="Remove Package", command=self.remove_package)
+        self.remove_button.pack(side=tk.LEFT)
+
         # Create a scrolled text area for output
         self.output_area = scrolledtext.ScrolledText(self.root, width=80, height=20)
         self.output_area.pack(padx=10, pady=10)
@@ -44,6 +48,20 @@ class PacmanGUI:
 
     def update_system(self):
         command = "pkexec pacman -Syu --noconfirm"
+        self.output_area.delete(1.0, tk.END)  # Clear previous output
+        self.output_area.insert(tk.END, f"Executing: {command}\n")
+        
+        # Run the command in a separate thread
+        thread = threading.Thread(target=self.execute_command, args=(command,))
+        thread.start()
+
+    def remove_package(self):
+        package_name = self.command_entry.get()
+        if not package_name:
+            messagebox.showerror("Error", "Please enter a package name to remove.")
+            return
+        
+        command = f"pkexec pacman -R --noconfirm {package_name}"
         self.output_area.delete(1.0, tk.END)  # Clear previous output
         self.output_area.insert(tk.END, f"Executing: {command}\n")
         
