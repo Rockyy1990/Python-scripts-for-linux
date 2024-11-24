@@ -19,7 +19,7 @@ if subprocess.call(["which", "pacstrap"], stdout=subprocess.PIPE, stderr=subproc
 # Define the packages to include in the ISO
 packages = [
     'linux-zen',
-    'linux-zen-header',
+    'linux-zen-headers',
     'linux-firmware',
     'base',
     'base-devel',
