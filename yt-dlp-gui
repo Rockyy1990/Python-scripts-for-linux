@@ -18,7 +18,7 @@ def download_video():
 
 def run_yt_dlp(url):
     # Prepare the command to run yt-dlp with the progress output option
-    command = ["yt-dlp", "-f", "best", "-o", "%(title)s.%(ext)s", url]
+    command = ["yt-dlp", "%(title)s.%(ext)s", url]
     
     process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
 
