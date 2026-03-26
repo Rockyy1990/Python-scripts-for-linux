@@ -252,7 +252,7 @@ def install_dev_tools():
     print(f"{ORANGE}-> Installiere System-Packages / Entwickler-Tools{RESET}")
     packages = [
         "build-essential", "fakeroot", "git", "htop", "cmake",
-        "gdb", "xfsdump", "f2fs-tools", "nginx"
+        "gdb", "xfsdump", "f2fs-tools", "nginx", "rsync", "quota"
     ]
     rc, _ = run_cmd(["apt", "install", "-y"] + packages)
     return rc == 0
