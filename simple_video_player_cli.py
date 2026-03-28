@@ -1,132 +1,225 @@
 #!/usr/bin/env python3
-# video_player.py
-# Simple terminal menu video player for Linux
-# Supports: mp4, mkv, webm
-# Uses ffplay (ffmpeg) for playback; PipeWire should be active for audio routing.
-# Menu color: orange
-# New: Option "p" to pick a path (file or directory)
+"""
+simple_video_player_cli.py
+Terminal-Menü-Videoplayer für Linux.
+Unterstützt: mp4, mkv, webm, avi, mov, flv, ts, m4v
+Wiedergabe via ffplay (ffmpeg); PipeWire empfohlen für Audio-Routing.
+"""
 
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
 
+# ── ANSI-Farben ───────────────────────────────────────────────────────────────
 ORANGE = "\033[38;5;208m"
-RESET = "\033[0m"
-BOLD = "\033[1m"
+DIM    = "\033[2m"
+RESET  = "\033[0m"
+BOLD   = "\033[1m"
 
-SUPPORTED_EXT = {".mp4", ".mkv", ".webm"}
+# ── Konstanten ────────────────────────────────────────────────────────────────
+SUPPORTED_EXT: frozenset[str] = frozenset(
+    {".mp4", ".mkv", ".webm", ".avi", ".mov", ".flv", ".ts", ".m4v"}
+)
+HEADER = f"{ORANGE}{BOLD}▶  Simple Video Player  (ffplay + PipeWire){RESET}"
+CONTROLS = (
+    f"  {ORANGE}<Nr>{RESET}  Datei abspielen   "
+    f"{ORANGE}p{RESET}  Pfad wählen   "
+    f"{ORANGE}s{RESET}  Stream-URL\n"
+    f"  {ORANGE}r{RESET}   Liste aktualisieren   "
+    f"{ORANGE}q{RESET}  Beenden"
+)
 
-def clear():
-    os.system("clear" if os.name == "posix" else "cls")
+# ── Tab-Completion für Pfadeingaben (optional, nur wenn readline verfügbar) ───
+try:
+    import readline
 
-def find_videos(directory: Path):
+    def _path_completer(text: str, state: int) -> str | None:
+        p = Path(text).expanduser()
+        base, prefix = (p.parent, p.name) if not text.endswith("/") else (p, "")
+        try:
+            matches = [
+                str(child) + ("/" if child.is_dir() else "")
+                for child in base.iterdir()
+                if child.name.startswith(prefix)
+            ]
+        except PermissionError:
+            matches = []
+        return matches[state] if state < len(matches) else None
+
+    readline.set_completer(_path_completer)
+    readline.set_completer_delims(" \t\n;")
+    readline.parse_and_bind("tab: complete")
+except ImportError:
+    pass  # readline ist optional (z. B. auf Windows nicht verfügbar)
+
+
+# ── Hilfsfunktionen ───────────────────────────────────────────────────────────
+def clear_screen() -> None:
+    """Bildschirm löschen via ANSI-Escape (schneller als os.system)."""
+    sys.stdout.write("\033[2J\033[H")
+    sys.stdout.flush()
+
+
+def pause(msg: str = "Enter drücken …") -> None:
+    input(f"{DIM}{msg}{RESET} ")
+
+
+def fmt_size(path: Path) -> str:
+    """Dateigröße als lesbaren String (KB / MB / GB)."""
+    try:
+        b = path.stat().st_size
+    except OSError:
+        return "?"
+    for unit, threshold in (("GB", 1 << 30), ("MB", 1 << 20), ("KB", 1 << 10)):
+        if b >= threshold:
+            return f"{b / threshold:.1f} {unit}"
+    return f"{b} B"
+
+
+def check_ffplay() -> str:
+    """Prüft beim Start einmalig, ob ffplay verfügbar ist."""
+    path = shutil.which("ffplay")
+    if path is None:
+        sys.exit(
+            "Fehler: ffplay nicht gefunden. "
+            "Bitte ffmpeg installieren (enthält ffplay)."
+        )
+    return path
+
+
+# ── Kernfunktionen ────────────────────────────────────────────────────────────
+def find_videos(directory: Path) -> list[Path]:
+    """
+    Scannt das Verzeichnis mit os.scandir() (schneller als Path.iterdir()
+    bei großen Verzeichnissen) und gibt sortierte Video-Pfade zurück.
+    """
     if not directory.is_dir():
         return []
-    files = [p for p in directory.iterdir() if p.suffix.lower() in SUPPORTED_EXT and p.is_file()]
-    files.sort()
-    return files
-
-def print_menu(videos, cwd):
-    clear()
-    print(f"{ORANGE}{BOLD}Simple Video Player (ffplay + PipeWire) {RESET}")
-    print()
-    print(f"Current directory: {cwd}")
-    print()
-    if not videos:
-        print("No supported video files found in current directory.")
-        print()
-    else:
-        print("Available videos:")
-        for i, v in enumerate(videos, start=1):
-            print(f"  {ORANGE}{i:2d}{RESET}. {v.name}")
-        print()
-    print("Controls:")
-    print("  Enter number to play")
-    print("  (p) Pick path (file or directory)")
-    print("  (s) Stream URL")
-    print("  (r) Refresh list  (q) Quit")
-    print()
-
-def run_ffplay(target: str):
-    args = ["ffplay", "-autoexit", "-loglevel", "warning", target]
+    videos: list[Path] = []
     try:
-        subprocess.run(args)
-    except FileNotFoundError:
-        print("ffplay not found. Install ffmpeg (provides ffplay).")
-        input("Press Enter to continue...")
+        with os.scandir(directory) as it:
+            for entry in it:
+                if (
+                    entry.is_file(follow_symlinks=True)
+                    and Path(entry.name).suffix.lower() in SUPPORTED_EXT
+                ):
+                    videos.append(Path(entry.path))
+    except PermissionError:
+        pass
+    videos.sort()
+    return videos
 
-def handle_pick_path():
-    inp = input("Enter file or directory path: ").strip()
-    if not inp:
+
+def print_menu(videos: list[Path], cwd: Path) -> None:
+    clear_screen()
+    print(HEADER)
+    print(f"\n{DIM}Verzeichnis:{RESET} {cwd}\n")
+
+    if not videos:
+        print(f"{DIM}Keine unterstützten Videodateien gefunden.{RESET}")
+    else:
+        col_w = len(str(len(videos)))  # Breite der Nummernspalte
+        for i, v in enumerate(videos, start=1):
+            size = fmt_size(v)
+            print(
+                f"  {ORANGE}{i:{col_w}d}{RESET}. "
+                f"{v.name}  {DIM}({size}){RESET}"
+            )
+
+    print(f"\n{CONTROLS}\n")
+
+
+def run_ffplay(ffplay_bin: str, target: str) -> None:
+    """Startet ffplay und wartet bis zur Beendigung."""
+    subprocess.run(
+        [ffplay_bin, "-autoexit", "-loglevel", "warning", target],
+        check=False,
+    )
+
+
+def resolve_path(raw: str) -> tuple[Path | None, str | None]:
+    """
+    Löst eine Benutzereingabe zu einem gültigen Pfad auf.
+    Gibt (Path, 'dir'|'file') oder (None, None) zurück.
+    """
+    if not raw:
         return None, None
-    p = Path(inp).expanduser()
+    p = Path(raw).expanduser().resolve()
     if not p.exists():
-        print("Path does not exist.")
-        input("Press Enter to continue...")
+        print(f"Pfad nicht gefunden: {p}")
+        pause()
         return None, None
     if p.is_dir():
         return p, "dir"
     if p.is_file() and p.suffix.lower() in SUPPORTED_EXT:
         return p, "file"
-    print("Unsupported file type.")
-    input("Press Enter to continue...")
+    print(f"Nicht unterstütztes Dateiformat: {p.suffix!r}")
+    pause()
     return None, None
 
-def stream_url(url: str):
-    run_ffplay(url)
 
-def main():
+# ── Hauptschleife ─────────────────────────────────────────────────────────────
+def main() -> None:
+    ffplay_bin = check_ffplay()
     cwd = Path.cwd()
     videos = find_videos(cwd)
 
     while True:
         print_menu(videos, cwd)
-        choice = input(f"{ORANGE}Choice:{RESET} ").strip()
-        if choice == "":
-            continue
-        if choice.lower() == "q":
-            break
-        if choice.lower() == "r":
-            videos = find_videos(cwd)
-            continue
-        if choice.lower() == "s":
-            url = input("Enter stream URL: ").strip()
-            if url:
-                stream_url(url)
-            continue
-        if choice.lower() == "p":
-            path, kind = handle_pick_path()
-            if path is None:
-                continue
-            if kind == "dir":
-                cwd = path
-                videos = find_videos(cwd)
-                continue
-            if kind == "file":
-                print(f"Playing file: {path}")
-                run_ffplay(str(path))
-                continue
-        if choice.isdigit():
-            idx = int(choice) - 1
-            if 0 <= idx < len(videos):
-                print(f"Playing: {videos[idx].name}")
-                run_ffplay(str(videos[idx]))
-            else:
-                print("Invalid selection.")
-                input("Press Enter to continue...")
-            continue
-        # treat input as path attempt
-        p = Path(choice).expanduser()
-        if p.exists() and p.is_file() and p.suffix.lower() in SUPPORTED_EXT:
-            run_ffplay(str(p))
-            continue
+        raw = input(f"{ORANGE}Auswahl:{RESET} ").strip()
 
-        print("Unknown option.")
-        input("Press Enter to continue...")
+        match raw.lower():
+            case "":
+                continue
+
+            case "q":
+                print("Tschüss!")
+                sys.exit(0)
+
+            case "r":
+                videos = find_videos(cwd)
+
+            case "s":
+                url = input("Stream-URL: ").strip()
+                if url:
+                    run_ffplay(ffplay_bin, url)
+
+            case "p":
+                raw_path = input("Pfad (Datei oder Verzeichnis): ").strip()
+                path, kind = resolve_path(raw_path)
+                if path is None:
+                    continue
+                if kind == "dir":
+                    cwd = path
+                    videos = find_videos(cwd)
+                else:
+                    run_ffplay(ffplay_bin, str(path))
+
+            case _ if raw.isdigit():
+                idx = int(raw) - 1
+                if 0 <= idx < len(videos):
+                    run_ffplay(ffplay_bin, str(videos[idx]))
+                else:
+                    print(f"Ungültige Auswahl (1–{len(videos)}).")
+                    pause()
+
+            case _:
+                # Freitext als Pfad interpretieren
+                path, kind = resolve_path(raw)
+                if path is None:
+                    print("Unbekannte Eingabe.")
+                    pause()
+                elif kind == "dir":
+                    cwd = path
+                    videos = find_videos(cwd)
+                else:
+                    run_ffplay(ffplay_bin, str(path))
+
 
 if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
-        print("\nExiting.")
+        print("\nAbgebrochen.")
