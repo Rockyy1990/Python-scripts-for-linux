@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+
 import shlex
 import subprocess
 import sys
@@ -23,7 +24,7 @@ def ffmpeg_supports_filter(filter_name):
 def print_menu():
     print(ORANGE + "\nffmpeg Video Converter Menü\n" + RESET)
     print("1) x264 (crf 20, preset medium, level 4, aac 224 kbps, stereo, loudnorm)")
-    print("2) x265 (vergleichbare qualität, crf 28, aac 224 kbps, stereo, loudnorm)")
+    print("2) x265 (vergleichbare qualität, crf 23, aac 224 kbps, stereo, loudnorm)")
     print("3) x264 VBR (target 2500k, maxrate 5000k, bufsize 10000k, aac 224 kbps, stereo, loudnorm)")
     print("4) x265 VBR (target 2500k, maxrate 5000k, bufsize 10000k, aac 224 kbps, stereo, loudnorm)")
     print("5) beenden\n")
@@ -109,7 +110,7 @@ def convert_x264(src, dest):
 def convert_x265(src, dest):
     cmd = [
         "ffmpeg", "-y", "-i", src,
-        "-c:v", "libx265", "-preset", "medium", "-crf", "28",
+        "-c:v", "libx265", "-preset", "medium", "-crf", "23",
     ] + base_audio_args() + [
         "-map_metadata", "0",
         "-fps_mode", FPS_MODE,
