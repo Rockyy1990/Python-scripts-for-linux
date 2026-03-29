@@ -13,15 +13,15 @@ from typing import Callable
 
 
 # ─────────────────────────────────────────────────────────
-#  Farb-Konstanten
+#  Farb-Konstanten  (Arch Linux Blau-Schema)
 # ─────────────────────────────────────────────────────────
-COLOR_ORANGE   = 1
-COLOR_SELECTED = 2
-COLOR_HEADER   = 3
-COLOR_FOOTER   = 4
-COLOR_ERROR    = 6
-COLOR_INPUT    = 7
-COLOR_BORDER   = 8
+COLOR_ACCENT   = 1   # Arch-Blau  (#1793D1)
+COLOR_SELECTED = 2   # Ausgewählter Eintrag (invertiert)
+COLOR_HEADER   = 3   # Titelzeile
+COLOR_FOOTER   = 4   # Fußzeile / Info-Text
+COLOR_ERROR    = 5   # Fehlermeldungen / Warnungen
+COLOR_INPUT    = 6   # Eingabefeld-Hintergrund
+COLOR_BORDER   = 7   # Rahmen & Trennlinien
 
 
 # ─────────────────────────────────────────────────────────
@@ -31,65 +31,113 @@ COLOR_BORDER   = 8
 class MenuItem:
     label:     str
     desc:      str
-    action:    Callable | None       = None
+    action:    Callable | None         = None
     submenu:   list["MenuItem"] | None = None
-    separator: bool                  = False
+    separator: bool                    = False
 
 
 # ─────────────────────────────────────────────────────────
-#  Farben initialisieren
+#  Farben initialisieren – Arch Linux Blau (#1793D1)
 # ─────────────────────────────────────────────────────────
 def init_colors() -> None:
     curses.start_color()
     curses.use_default_colors()
 
     if curses.can_change_color() and curses.COLORS >= 256:
-        curses.init_color(9,  1000, 650, 0)   # Orange
-        curses.init_color(10,  800, 400, 0)   # Dunkel-Orange
-        ORANGE      = 9
-        DARK_ORANGE = 10
+        # #1793D1 = RGB(23, 147, 209) → curses 0–1000-Skala: (90, 576, 820)
+        curses.init_color(9,   90,  576,  820)   # Arch-Blau
+        curses.init_color(10,  50,  300,  560)   # Dunkel-Blau
+        ARCH_BLUE = 9
+        DARK_BLUE = 10
     else:
-        ORANGE      = curses.COLOR_YELLOW
-        DARK_ORANGE = curses.COLOR_YELLOW
+        ARCH_BLUE = curses.COLOR_CYAN
+        DARK_BLUE = curses.COLOR_BLUE
 
-    BG = -1
+    BG = -1  # transparenter Terminal-Hintergrund
 
-    curses.init_pair(COLOR_ORANGE,   ORANGE,             BG)
-    curses.init_pair(COLOR_SELECTED, curses.COLOR_BLACK, ORANGE)
-    curses.init_pair(COLOR_HEADER,   ORANGE,             BG)
-    curses.init_pair(COLOR_FOOTER,   DARK_ORANGE,        BG)
-    curses.init_pair(COLOR_ERROR,    curses.COLOR_RED,   BG)
-    curses.init_pair(COLOR_INPUT,    curses.COLOR_BLACK, ORANGE)
-    curses.init_pair(COLOR_BORDER,   DARK_ORANGE,        BG)
+    curses.init_pair(COLOR_ACCENT,   ARCH_BLUE,           BG)
+    curses.init_pair(COLOR_SELECTED, curses.COLOR_BLACK,  ARCH_BLUE)
+    curses.init_pair(COLOR_HEADER,   ARCH_BLUE,           BG)
+    curses.init_pair(COLOR_FOOTER,   DARK_BLUE,           BG)
+    curses.init_pair(COLOR_ERROR,    curses.COLOR_RED,    BG)
+    curses.init_pair(COLOR_INPUT,    curses.COLOR_BLACK,  ARCH_BLUE)
+    curses.init_pair(COLOR_BORDER,   DARK_BLUE,           BG)
 
 
 # ─────────────────────────────────────────────────────────
-#  Befehl ausführen (verlässt curses temporär)
+#  Hilfs-Funktion: Text sicher in Fenster schreiben
+# ─────────────────────────────────────────────────────────
+def _safe_addstr(
+    win: curses.window, y: int, x: int, text: str, max_width: int
+) -> None:
+    """Schreibt text ab (y, x), abgeschnitten auf max_width Zeichen.
+    Ignoriert curses.error am Fensterrand (z. B. rechte untere Ecke)."""
+    try:
+        win.addstr(y, x, text[:max(0, max_width)])
+    except curses.error:
+        pass
+
+
+# ─────────────────────────────────────────────────────────
+#  Befehl ausführen  (verlässt curses temporär)
 # ─────────────────────────────────────────────────────────
 def run_command(stdscr: curses.window, cmd: list[str], title: str) -> int:
     curses.endwin()
 
-    line = "=" * 60
-    print()
-    print(line)
-    print(f"  >> {title}")
+    sep = "═" * 60
+    print(f"\n{sep}")
+    print(f"  ▶  {title}")
     print(f"  CMD: {' '.join(cmd)}")
-    print(line)
-    print()
+    print(f"{sep}\n")
 
     result = subprocess.run(cmd)
 
-    print()
-    print(line)
+    print(f"\n{sep}")
     if result.returncode == 0:
-        print("  [OK] Erfolgreich abgeschlossen.")
+        print("  [✓] Erfolgreich abgeschlossen.")
     else:
-        print(f"  [!!] Fehler - Exit-Code: {result.returncode}")
-    print(line)
-    input("[Enter] druecken um zurueckzukehren ...")
+        print(f"  [✗] Fehler – Exit-Code: {result.returncode}")
+    print(sep)
+    input("\n  [Enter] drücken, um zurückzukehren … ")
 
     stdscr.refresh()
     return result.returncode
+
+
+# ─────────────────────────────────────────────────────────
+#  Nachrichten-Dialog  (reine Info, nur Enter/Leertaste)
+# ─────────────────────────────────────────────────────────
+def message_dialog(stdscr: curses.window, title: str, message: str) -> None:
+    height, width = stdscr.getmaxyx()
+    dh, dw = 7, min(62, width - 4)
+    sy = (height - dh) // 2
+    sx = (width  - dw) // 2
+
+    win = curses.newwin(dh, dw, sy, sx)
+    win.bkgd(" ", curses.color_pair(COLOR_ACCENT))
+    win.border()
+
+    win.attron(curses.color_pair(COLOR_HEADER) | curses.A_BOLD)
+    _safe_addstr(win, 1, 2, f"  {title}", dw - 4)
+    win.attroff(curses.color_pair(COLOR_HEADER) | curses.A_BOLD)
+
+    win.attron(curses.color_pair(COLOR_ACCENT))
+    _safe_addstr(win, 3, 2, f"  {message}", dw - 4)
+    win.attroff(curses.color_pair(COLOR_ACCENT))
+
+    win.attron(curses.color_pair(COLOR_SELECTED) | curses.A_BOLD)
+    _safe_addstr(win, 5, 2, "  [Enter] OK  ", dw - 4)
+    win.attroff(curses.color_pair(COLOR_SELECTED) | curses.A_BOLD)
+    win.refresh()
+
+    while True:
+        key = win.getch()
+        if key in (10, curses.KEY_ENTER, ord(" "), 27):
+            break
+
+    del win
+    stdscr.touchwin()
+    stdscr.refresh()
 
 
 # ─────────────────────────────────────────────────────────
@@ -97,28 +145,27 @@ def run_command(stdscr: curses.window, cmd: list[str], title: str) -> int:
 # ─────────────────────────────────────────────────────────
 def input_dialog(stdscr: curses.window, prompt: str) -> str:
     height, width = stdscr.getmaxyx()
-    dh = 7
-    dw = min(60, width - 4)
+    dh, dw = 7, min(62, width - 4)
     sy = (height - dh) // 2
     sx = (width  - dw) // 2
 
     win = curses.newwin(dh, dw, sy, sx)
-    win.bkgd(" ", curses.color_pair(COLOR_ORANGE))
+    win.bkgd(" ", curses.color_pair(COLOR_ACCENT))
     win.border()
 
     win.attron(curses.color_pair(COLOR_HEADER) | curses.A_BOLD)
-    win.addstr(1, 2, prompt[: dw - 4])
+    _safe_addstr(win, 1, 2, f"  {prompt}", dw - 4)
     win.attroff(curses.color_pair(COLOR_HEADER) | curses.A_BOLD)
 
-    win.addstr(3, 2, "> ")
+    _safe_addstr(win, 3, 2, "  ▶ ", dw - 4)
     win.attron(curses.color_pair(COLOR_INPUT))
-    win.addstr(3, 4, " " * (dw - 6))
+    _safe_addstr(win, 3, 6, " " * (dw - 8), dw - 8)
     win.attroff(curses.color_pair(COLOR_INPUT))
     win.refresh()
 
     curses.echo()
     curses.curs_set(1)
-    raw = win.getstr(3, 4, dw - 6)
+    raw = win.getstr(3, 6, dw - 8)
     curses.noecho()
     curses.curs_set(0)
 
@@ -133,25 +180,24 @@ def input_dialog(stdscr: curses.window, prompt: str) -> str:
 # ─────────────────────────────────────────────────────────
 def confirm_dialog(stdscr: curses.window, message: str) -> bool:
     height, width = stdscr.getmaxyx()
-    dh = 7
-    dw = min(56, width - 4)
+    dh, dw = 7, min(58, width - 4)
     sy = (height - dh) // 2
     sx = (width  - dw) // 2
 
     win = curses.newwin(dh, dw, sy, sx)
-    win.bkgd(" ", curses.color_pair(COLOR_ORANGE))
+    win.bkgd(" ", curses.color_pair(COLOR_ACCENT))
     win.border()
 
     win.attron(curses.color_pair(COLOR_ERROR) | curses.A_BOLD)
-    win.addstr(1, 2, "!! Bestaetigung erforderlich")
+    _safe_addstr(win, 1, 2, "  !! Bestätigung erforderlich", dw - 4)
     win.attroff(curses.color_pair(COLOR_ERROR) | curses.A_BOLD)
 
-    win.attron(curses.color_pair(COLOR_ORANGE))
-    win.addstr(3, 2, message[: dw - 4])
-    win.attroff(curses.color_pair(COLOR_ORANGE))
+    win.attron(curses.color_pair(COLOR_ACCENT))
+    _safe_addstr(win, 3, 2, f"  {message}", dw - 4)
+    win.attroff(curses.color_pair(COLOR_ACCENT))
 
     win.attron(curses.color_pair(COLOR_SELECTED) | curses.A_BOLD)
-    win.addstr(5, 2, "  [J] Ja        [N] Nein  ")
+    _safe_addstr(win, 5, 2, "  [J/Y] Ja        [N/Q] Nein  ", dw - 4)
     win.attroff(curses.color_pair(COLOR_SELECTED) | curses.A_BOLD)
     win.refresh()
 
@@ -159,14 +205,10 @@ def confirm_dialog(stdscr: curses.window, message: str) -> bool:
         key = win.getch()
         ch  = chr(key).lower() if 0 < key < 256 else ""
         if ch in ("j", "y"):
-            del win
-            stdscr.touchwin()
-            stdscr.refresh()
+            del win; stdscr.touchwin(); stdscr.refresh()
             return True
-        if ch in ("n", "q"):
-            del win
-            stdscr.touchwin()
-            stdscr.refresh()
+        if ch in ("n", "q") or key == 27:
+            del win; stdscr.touchwin(); stdscr.refresh()
             return False
 
 
@@ -179,77 +221,102 @@ def draw_menu(
     selected:   int,
     title:      str,
     breadcrumb: str = "",
+    offset:     int = 0,
 ) -> None:
     stdscr.erase()
     height, width = stdscr.getmaxyx()
+    inner_w = width - 4   # nutzbare Breite ohne Rahmen-Zeichen
 
-    # Rahmen
+    # ── Rahmen ───────────────────────────────────────────
     stdscr.attron(curses.color_pair(COLOR_BORDER))
     stdscr.border()
     stdscr.attroff(curses.color_pair(COLOR_BORDER))
 
-    # Header
+    # ── Header ───────────────────────────────────────────
     stdscr.attron(curses.color_pair(COLOR_HEADER) | curses.A_BOLD)
-    stdscr.addstr(1, 2, "  Arch Linux System Manager"[: width - 4])
-    stdscr.addstr(2, 2, ("-" * (width - 4))[: width - 4])
-
-    if breadcrumb:
-        stdscr.addstr(3, 2, f"  > {breadcrumb}"[: width - 4])
-    else:
-        stdscr.addstr(3, 2, f"  {title}"[: width - 4])
-
+    _safe_addstr(stdscr, 1, 2, "   Arch Linux System Manager", inner_w)
+    _safe_addstr(stdscr, 2, 2, "─" * inner_w, inner_w)
+    heading = f"   ▸ {breadcrumb}" if breadcrumb else f"   {title}"
+    _safe_addstr(stdscr, 3, 2, heading, inner_w)
     stdscr.attroff(curses.color_pair(COLOR_HEADER) | curses.A_BOLD)
 
+    # ── Einträge ─────────────────────────────────────────
     menu_start = 5
+    max_rows   = height - menu_start - 4
+    visible    = items[offset: offset + max_rows]
 
-    # Einträge
-    visible = items[: height - menu_start - 4]
     for idx, item in enumerate(visible):
-        y = menu_start + idx
+        y       = menu_start + idx
+        abs_idx = idx + offset    # absoluter Index in items[]
 
         if item.separator:
             stdscr.attron(curses.color_pair(COLOR_BORDER))
-            stdscr.addstr(y, 4, ("-" * (width - 8))[: width - 8])
+            _safe_addstr(stdscr, y, 4, "─" * (inner_w - 2), inner_w - 2)
             stdscr.attroff(curses.color_pair(COLOR_BORDER))
             continue
 
-        prefix = "  >> " if idx == selected else "     "
+        is_sel = abs_idx == selected
+        prefix = "  ▶ " if is_sel else "    "
         label  = f"{prefix}{item.label}"
 
-        if idx == selected:
+        if is_sel:
             stdscr.attron(curses.color_pair(COLOR_SELECTED) | curses.A_BOLD)
-            stdscr.addstr(y, 2, label[: width - 4])
-            pad = width - 4 - len(label)
+            _safe_addstr(stdscr, y, 2, label, inner_w)
+            pad = inner_w - len(label)
             if pad > 0:
-                stdscr.addstr(y, 2 + len(label), " " * pad)
+                _safe_addstr(stdscr, y, 2 + len(label), " " * pad, pad)
             stdscr.attroff(curses.color_pair(COLOR_SELECTED) | curses.A_BOLD)
         else:
-            stdscr.attron(curses.color_pair(COLOR_ORANGE))
-            stdscr.addstr(y, 2, label[: width - 4])
-            stdscr.attroff(curses.color_pair(COLOR_ORANGE))
+            stdscr.attron(curses.color_pair(COLOR_ACCENT))
+            _safe_addstr(stdscr, y, 2, label, inner_w)
+            stdscr.attroff(curses.color_pair(COLOR_ACCENT))
 
-    # Beschreibung
+    # ── Scroll-Indikatoren ───────────────────────────────
+    mid = width // 2
+    if offset > 0:
+        stdscr.attron(curses.color_pair(COLOR_BORDER) | curses.A_BOLD)
+        _safe_addstr(stdscr, menu_start - 1, mid - 1, " ▲ ", 3)
+        stdscr.attroff(curses.color_pair(COLOR_BORDER) | curses.A_BOLD)
+    if offset + max_rows < len(items):
+        stdscr.attron(curses.color_pair(COLOR_BORDER) | curses.A_BOLD)
+        _safe_addstr(stdscr, menu_start + max_rows, mid - 1, " ▼ ", 3)
+        stdscr.attroff(curses.color_pair(COLOR_BORDER) | curses.A_BOLD)
+
+    # ── Beschreibungs-Zeile ──────────────────────────────
     if 0 <= selected < len(items) and not items[selected].separator:
         desc_y = height - 4
         stdscr.attron(curses.color_pair(COLOR_BORDER))
-        stdscr.addstr(desc_y - 1, 2, ("-" * (width - 4))[: width - 4])
+        _safe_addstr(stdscr, desc_y - 1, 2, "─" * inner_w, inner_w)
         stdscr.attroff(curses.color_pair(COLOR_BORDER))
         stdscr.attron(curses.color_pair(COLOR_FOOTER))
-        stdscr.addstr(desc_y, 2, f"  Info: {items[selected].desc}"[: width - 4])
+        _safe_addstr(stdscr, desc_y, 2, f"  ℹ  {items[selected].desc}", inner_w)
         stdscr.attroff(curses.color_pair(COLOR_FOOTER))
 
-    # Footer
-    footer = "  [Auf/Ab] Navigieren   [Enter] Auswaehlen   [Q] Zurueck/Beenden"
+    # ── Footer ───────────────────────────────────────────
+    footer = "  [↑↓] Navigieren   [Enter] Auswählen   [1–9] Schnellwahl   [Q] Zurück"
     stdscr.attron(curses.color_pair(COLOR_FOOTER) | curses.A_DIM)
-    stdscr.addstr(height - 2, 2, footer[: width - 4])
+    _safe_addstr(stdscr, height - 2, 2, footer, inner_w)
     stdscr.attroff(curses.color_pair(COLOR_FOOTER) | curses.A_DIM)
 
     stdscr.refresh()
 
 
 # ─────────────────────────────────────────────────────────
-#  Generische Menü-Schleife
+#  Generische Menü-Schleife  (Scroll + Schnellwahl)
 # ─────────────────────────────────────────────────────────
+def _build_quick_map(items: list[MenuItem], selectable: list[int]) -> dict[int, int]:
+    """Bildet Zifferntasten '1'–'9' und 'Q' auf selectable-Indizes ab."""
+    qmap: dict[int, int] = {}
+    for si, abs_i in enumerate(selectable):
+        lbl = items[abs_i].label.strip()
+        if len(lbl) >= 3 and lbl[0] == "[" and lbl[2] == "]":
+            ch = lbl[1].lower()
+            qmap[ord(ch)] = si
+            if ch.isalpha():
+                qmap[ord(ch.upper())] = si
+    return qmap
+
+
 def run_menu(
     stdscr:     curses.window,
     items:      list[MenuItem],
@@ -257,11 +324,28 @@ def run_menu(
     breadcrumb: str = "",
 ) -> None:
     selectable = [i for i, m in enumerate(items) if not m.separator]
-    pos = 0
+    if not selectable:
+        return
+
+    quick_map = _build_quick_map(items, selectable)
+    pos       = 0    # Index in selectable[]
+    offset    = 0    # Scroll-Offset in items[]
+
+    def _visible_rows() -> int:
+        h, _ = stdscr.getmaxyx()
+        return max(1, h - 5 - 4)   # menu_start=5, Fußbereich=4
 
     while True:
         selected = selectable[pos]
-        draw_menu(stdscr, items, selected, title, breadcrumb)
+
+        # Scroll-Offset nachführen (selected immer sichtbar halten)
+        vr = _visible_rows()
+        if selected < offset:
+            offset = selected
+        elif selected >= offset + vr:
+            offset = selected - vr + 1
+
+        draw_menu(stdscr, items, selected, title, breadcrumb, offset)
         key = stdscr.getch()
 
         match key:
@@ -273,19 +357,29 @@ def run_menu(
                 pos = 0
             case curses.KEY_END:
                 pos = len(selectable) - 1
+            case curses.KEY_PPAGE:                          # Bild ↑
+                pos = max(0, pos - max(1, vr // 2))
+            case curses.KEY_NPAGE:                          # Bild ↓
+                pos = min(len(selectable) - 1, pos + max(1, vr // 2))
             case 10 | curses.KEY_ENTER:
                 item = items[selected]
                 if item.submenu:
-                    bc = f"{breadcrumb} > {item.label}" if breadcrumb else f"{title} > {item.label}"
+                    bc = (
+                        f"{breadcrumb} > {item.label}"
+                        if breadcrumb
+                        else f"{title} > {item.label}"
+                    )
                     run_menu(stdscr, item.submenu, item.label, bc)
                 elif item.action:
                     item.action()
+            case _ if key in quick_map:
+                pos = quick_map[key]
             case _ if key in (ord("q"), ord("Q"), 27):
                 return
 
 
 # ─────────────────────────────────────────────────────────
-#  Alle Aktionen (Closures über stdscr)
+#  Alle Aktionen  (Closures über stdscr)
 # ─────────────────────────────────────────────────────────
 def make_actions(stdscr: curses.window) -> dict[str, Callable]:
 
@@ -351,16 +445,16 @@ def make_actions(stdscr: curses.window) -> dict[str, Callable]:
 
     def refresh_keys():
         run_command(stdscr, ["sudo", "pacman-key", "--refresh-keys"],
-                    "GPG-Schluessel aktualisieren")
+                    "GPG-Schlüssel aktualisieren")
 
     def populate_keys():
         run_command(stdscr,
                     ["sudo", "pacman-key", "--populate", "archlinux"],
-                    "Schluessel befuellen")
+                    "Schlüssel befüllen")
 
     def init_keyring():
         run_command(stdscr, ["sudo", "pacman-key", "--init"],
-                    "Schluessel initialisieren")
+                    "Schlüssel initialisieren")
 
     # ── Cache & Wartung ─────────────────────────────────
     def clean_cache():
@@ -368,26 +462,27 @@ def make_actions(stdscr: curses.window) -> dict[str, Callable]:
                     "Paket-Cache bereinigen")
 
     def clean_cache_all():
-        if confirm_dialog(stdscr, "Gesamten Cache loeschen? (pacman -Scc)"):
+        if confirm_dialog(stdscr, "Gesamten Cache löschen? (pacman -Scc)"):
             run_command(stdscr, ["sudo", "pacman", "-Scc", "--noconfirm"],
-                        "Gesamten Cache loeschen")
+                        "Gesamten Cache löschen")
 
     def list_orphans():
         run_command(stdscr, ["pacman", "-Qdt"],
                     "Verwaiste Pakete anzeigen")
 
     def remove_orphans():
-        if confirm_dialog(stdscr, "Alle verwaisten Pakete entfernen?"):
-            orphans = subprocess.run(
-                ["pacman", "-Qdtq"],
-                capture_output=True, text=True
-            ).stdout.split()
-            if orphans:
-                run_command(stdscr,
-                            ["sudo", "pacman", "-Rns", "--noconfirm"] + orphans,
-                            "Verwaiste Pakete entfernen")
-            else:
-                confirm_dialog(stdscr, "Keine verwaisten Pakete gefunden.")
+        if not confirm_dialog(stdscr, "Alle verwaisten Pakete entfernen?"):
+            return
+        orphans = subprocess.run(
+            ["pacman", "-Qdtq"],
+            capture_output=True, text=True
+        ).stdout.split()
+        if orphans:
+            run_command(stdscr,
+                        ["sudo", "pacman", "-Rns", "--noconfirm"] + orphans,
+                        "Verwaiste Pakete entfernen")
+        else:
+            message_dialog(stdscr, "Wartung", "Keine verwaisten Pakete gefunden.")
 
     # ── System ──────────────────────────────────────────
     def system_reboot():
@@ -433,99 +528,71 @@ def build_menu(a: dict[str, Callable]) -> list[MenuItem]:
             label="[1] Update & Upgrade",
             desc="Datenbank synchronisieren und System aktualisieren",
             submenu=[
-                MenuItem(
-                    "[1] Datenbank synchronisieren",
-                    "sudo pacman -Sy",
-                    action=a["sync"],
-                ),
-                MenuItem(
-                    "[2] System-Upgrade (pacman)",
-                    "sudo pacman -Syu --noconfirm",
-                    action=a["upgrade_pacman"],
-                ),
-                MenuItem(
-                    "[3] System-Upgrade (yay)",
-                    "yay -Syu --noconfirm  (pacman + AUR)",
-                    action=a["upgrade_yay"],
-                ),
+                MenuItem("[1] Datenbank synchronisieren",
+                         "sudo pacman -Sy",
+                         action=a["sync"]),
+                MenuItem("[2] System-Upgrade (pacman)",
+                         "sudo pacman -Syu --noconfirm",
+                         action=a["upgrade_pacman"]),
+                MenuItem("[3] System-Upgrade (yay)",
+                         "yay -Syu --noconfirm  (pacman + AUR)",
+                         action=a["upgrade_yay"]),
             ],
         ),
         MenuItem("", "", separator=True),
         MenuItem(
             label="[2] Pakete installieren",
-            desc="Pakete ueber pacman oder yay installieren",
+            desc="Pakete über pacman oder yay installieren",
             submenu=[
-                MenuItem(
-                    "[1] Installieren via pacman",
-                    "sudo pacman -S <paket>",
-                    action=a["install_pacman"],
-                ),
-                MenuItem(
-                    "[2] Installieren via yay (AUR)",
-                    "yay -S <paket>",
-                    action=a["install_yay"],
-                ),
+                MenuItem("[1] Installieren via pacman",
+                         "sudo pacman -S <paket>",
+                         action=a["install_pacman"]),
+                MenuItem("[2] Installieren via yay (AUR)",
+                         "yay -S <paket>",
+                         action=a["install_yay"]),
                 MenuItem("", "", separator=True),
-                MenuItem(
-                    "[3] Paket suchen",
-                    "yay -Ss <suchbegriff>",
-                    action=a["search"],
-                ),
-                MenuItem(
-                    "[4] Installierte Pakete auflisten",
-                    "pacman -Q",
-                    action=a["list_installed"],
-                ),
+                MenuItem("[3] Paket suchen",
+                         "yay -Ss <suchbegriff>",
+                         action=a["search"]),
+                MenuItem("[4] Installierte Pakete auflisten",
+                         "pacman -Q",
+                         action=a["list_installed"]),
             ],
         ),
         MenuItem("", "", separator=True),
         MenuItem(
             label="[3] Pakete entfernen",
-            desc="Pakete ueber pacman oder yay entfernen",
+            desc="Pakete über pacman oder yay entfernen",
             submenu=[
-                MenuItem(
-                    "[1] Entfernen via pacman",
-                    "sudo pacman -Rns <paket>",
-                    action=a["remove_pacman"],
-                ),
-                MenuItem(
-                    "[2] Entfernen via yay",
-                    "yay -Rns <paket>",
-                    action=a["remove_yay"],
-                ),
+                MenuItem("[1] Entfernen via pacman",
+                         "sudo pacman -Rns <paket>",
+                         action=a["remove_pacman"]),
+                MenuItem("[2] Entfernen via yay",
+                         "yay -Rns <paket>",
+                         action=a["remove_yay"]),
             ],
         ),
         MenuItem("", "", separator=True),
         MenuItem(
             label="[4] Keyring & Datenbank",
-            desc="Schluessel und Paketdatenbank verwalten",
+            desc="Schlüssel und Paketdatenbank verwalten",
             submenu=[
-                MenuItem(
-                    "[1] Arch Keyring aktualisieren",
-                    "pacman -Sy --needed archlinux-keyring",
-                    action=a["update_keyring"],
-                ),
-                MenuItem(
-                    "[2] Datenbank erzwungen erneuern",
-                    "pacman -Syy",
-                    action=a["refresh_db"],
-                ),
+                MenuItem("[1] Arch Keyring aktualisieren",
+                         "pacman -Sy --needed archlinux-keyring",
+                         action=a["update_keyring"]),
+                MenuItem("[2] Datenbank erzwungen erneuern",
+                         "pacman -Syy",
+                         action=a["refresh_db"]),
                 MenuItem("", "", separator=True),
-                MenuItem(
-                    "[3] GPG-Schluessel aktualisieren",
-                    "pacman-key --refresh-keys",
-                    action=a["refresh_keys"],
-                ),
-                MenuItem(
-                    "[4] Schluessel befuellen",
-                    "pacman-key --populate archlinux",
-                    action=a["populate_keys"],
-                ),
-                MenuItem(
-                    "[5] Schluessel initialisieren",
-                    "pacman-key --init",
-                    action=a["init_keyring"],
-                ),
+                MenuItem("[3] GPG-Schlüssel aktualisieren",
+                         "pacman-key --refresh-keys",
+                         action=a["refresh_keys"]),
+                MenuItem("[4] Schlüssel befüllen",
+                         "pacman-key --populate archlinux",
+                         action=a["populate_keys"]),
+                MenuItem("[5] Schlüssel initialisieren",
+                         "pacman-key --init",
+                         action=a["init_keyring"]),
             ],
         ),
         MenuItem("", "", separator=True),
@@ -533,27 +600,19 @@ def build_menu(a: dict[str, Callable]) -> list[MenuItem]:
             label="[5] Cache & Wartung",
             desc="Cache bereinigen und Orphans verwalten",
             submenu=[
-                MenuItem(
-                    "[1] Cache bereinigen",
-                    "pacman -Sc",
-                    action=a["clean_cache"],
-                ),
-                MenuItem(
-                    "[2] Gesamten Cache loeschen",
-                    "pacman -Scc",
-                    action=a["clean_cache_all"],
-                ),
+                MenuItem("[1] Cache bereinigen",
+                         "pacman -Sc",
+                         action=a["clean_cache"]),
+                MenuItem("[2] Gesamten Cache löschen",
+                         "pacman -Scc",
+                         action=a["clean_cache_all"]),
                 MenuItem("", "", separator=True),
-                MenuItem(
-                    "[3] Verwaiste Pakete anzeigen",
-                    "pacman -Qdt",
-                    action=a["list_orphans"],
-                ),
-                MenuItem(
-                    "[4] Verwaiste Pakete entfernen",
-                    "pacman -Rns $(pacman -Qdtq)",
-                    action=a["remove_orphans"],
-                ),
+                MenuItem("[3] Verwaiste Pakete anzeigen",
+                         "pacman -Qdt",
+                         action=a["list_orphans"]),
+                MenuItem("[4] Verwaiste Pakete entfernen",
+                         "pacman -Rns $(pacman -Qdtq)",
+                         action=a["remove_orphans"]),
             ],
         ),
         MenuItem("", "", separator=True),
@@ -561,16 +620,12 @@ def build_menu(a: dict[str, Callable]) -> list[MenuItem]:
             label="[6] System",
             desc="Neustart oder Herunterfahren",
             submenu=[
-                MenuItem(
-                    "[1] Neustart",
-                    "sudo reboot",
-                    action=a["reboot"],
-                ),
-                MenuItem(
-                    "[2] Herunterfahren",
-                    "sudo shutdown -h now",
-                    action=a["shutdown"],
-                ),
+                MenuItem("[1] Neustart",
+                         "sudo reboot",
+                         action=a["reboot"]),
+                MenuItem("[2] Herunterfahren",
+                         "sudo shutdown -h now",
+                         action=a["shutdown"]),
             ],
         ),
         MenuItem("", "", separator=True),
@@ -591,17 +646,30 @@ def main(stdscr: curses.window) -> None:
     stdscr.keypad(True)
 
     init_colors()
-    stdscr.bkgd(" ", curses.color_pair(COLOR_ORANGE))
+    stdscr.bkgd(" ", curses.color_pair(COLOR_ACCENT))
 
     actions = make_actions(stdscr)
     menu    = build_menu(actions)
 
-    selectable = [i for i, m in enumerate(menu) if not m.separator]
-    pos = 0
+    selectable  = [i for i, m in enumerate(menu) if not m.separator]
+    quick_map   = _build_quick_map(menu, selectable)
+    pos         = 0
+    offset      = 0
+
+    def _visible_rows() -> int:
+        h, _ = stdscr.getmaxyx()
+        return max(1, h - 5 - 4)
 
     while True:
         selected = selectable[pos]
-        draw_menu(stdscr, menu, selected, "Hauptmenue")
+
+        vr = _visible_rows()
+        if selected < offset:
+            offset = selected
+        elif selected >= offset + vr:
+            offset = selected - vr + 1
+
+        draw_menu(stdscr, menu, selected, "Hauptmenü", offset=offset)
         key = stdscr.getch()
 
         match key:
@@ -613,9 +681,13 @@ def main(stdscr: curses.window) -> None:
                 pos = 0
             case curses.KEY_END:
                 pos = len(selectable) - 1
+            case curses.KEY_PPAGE:
+                pos = max(0, pos - max(1, vr // 2))
+            case curses.KEY_NPAGE:
+                pos = min(len(selectable) - 1, pos + max(1, vr // 2))
             case 10 | curses.KEY_ENTER:
                 item = menu[selected]
-                if item.label == "[Q] Beenden":
+                if item.label.startswith("[Q]"):
                     if confirm_dialog(stdscr, "Programm wirklich beenden?"):
                         return
                 elif item.submenu:
@@ -623,10 +695,27 @@ def main(stdscr: curses.window) -> None:
                         stdscr,
                         item.submenu,
                         item.label,
-                        breadcrumb=f"Hauptmenue > {item.label}",
+                        breadcrumb=f"Hauptmenü > {item.label}",
                     )
                 elif item.action:
                     item.action()
+            case _ if key in quick_map:
+                new_pos = quick_map[key]
+                item    = menu[selectable[new_pos]]
+                if item.label.startswith("[Q]"):
+                    if confirm_dialog(stdscr, "Programm wirklich beenden?"):
+                        return
+                elif item.submenu:
+                    run_menu(
+                        stdscr,
+                        item.submenu,
+                        item.label,
+                        breadcrumb=f"Hauptmenü > {item.label}",
+                    )
+                elif item.action:
+                    item.action()
+                else:
+                    pos = new_pos
             case _ if key in (ord("q"), ord("Q"), 27):
                 if confirm_dialog(stdscr, "Programm wirklich beenden?"):
                     return
@@ -637,7 +726,7 @@ def main(stdscr: curses.window) -> None:
 # ─────────────────────────────────────────────────────────
 if __name__ == "__main__":
     if os.geteuid() == 0:
-        print("Bitte NICHT als root starten. sudo wird intern verwendet.")
+        print("Bitte NICHT als root starten – sudo wird intern verwendet.")
         sys.exit(1)
 
     try:
