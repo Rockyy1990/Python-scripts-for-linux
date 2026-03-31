@@ -386,8 +386,8 @@ def menu_formats() -> None:
 def print_main_menu() -> None:
     clear()
     print(f"{ORANGE}{BOLD}  ╔══════════════════════════════════════════════╗")
-    print(  "  ║         Simple Video Player  v2.1           ║")
-    print(  "  ║         ffplay  +  PipeWire / PulseAudio    ║")
+    print(  "  ║         Simple Video Player  v2.1            ║")
+    print(  "  ║      ffplay  +  PipeWire / PulseAudio        ║")
     print(f"  ╚══════════════════════════════════════════════╝{RESET}")
     print()
     print(f"  {ORANGE}1{RESET}  Datei öffnen              {DIM}(direkter Pfad){RESET}")
